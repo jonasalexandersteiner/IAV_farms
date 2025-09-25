@@ -1,0 +1,1085 @@
+---
+title: "SIV Risk Factor Analysis: BinaryPLSR (PLS-DA)"
+author: "jonasalexandersteiner"
+date: "2025-08-13"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: readable
+    df_print: paged
+    highlight: tango
+params:
+  plsda_results: NULL
+  self_contained: true
+---
+
+```{r setup, include=FALSE}
+set.seed(42)
+library(tidyverse)
+library(mixOmics)
+library(DT)
+library(viridis)
+library(pROC)
+library(car)
+```
+
+# Research Question & Hypothesis
+
+This report investigates predictors (risk factors) for SIV positivity in swine farms using BinaryPLSR (PLS-DA). The hypothesis is that farm-level management, animal contact, and biosecurity variables are associated with SIV status.
+
+---
+
+## Data Source & Preprocessing
+
+- **Raw data file:** Data was loaded from `df3` (see analysis script for details).
+- **Analysis script version, git commit, and random seed** used for model fitting and cross-validation are printed below for reproducibility.
+- **Removed predictors log:** See `removed_predictors_log.csv` for details of all predictors filtered out at each stage.
+- **Removed reference dummies log:** See `removed_reference_dummies_log.csv` for details of reference dummy columns dropped during encoding.
+- **Preprocessing steps summary:**
+    - Filtering and imputation (see analysis script and log files for details)
+    - Dummy coding of categorical variables
+    - Standardization of predictors
+    - Any rows with missing outcome (`SIV_positive`) were removed
+
+```{r data-load, include=FALSE}
+if (exists("params") && !is.null(params$plsda_results)) {
+  plsda_results <- params$plsda_results
+} else if (file.exists("plsda_analysis_results_subsets.rds")) {
+  plsda_results <- readRDS("plsda_analysis_results_subsets.rds")
+} else if (file.exists("plsda_analysis_results.rds")) {
+  plsda_results <- list(full = readRDS("plsda_analysis_results.rds"))
+} else {
+  stop("Could not find analysis results RDS file. Please provide results via params or run the analysis script.")
+}
+subset_labels <- c(Husbandry = "Husbandry", Animals = "Animal Health", Environment = "Environment", Human = "Human/Contact")
+```
+
+## Reproducibility: Script Version, Git Commit, and Random Seed
+
+```{r provenance, echo=FALSE}
+any_subset <- plsda_results[[1]]
+if (!is.null(any_subset$script_version)) cat("**Analysis script version:**", any_subset$script_version, "\n\n")
+if (!is.null(any_subset$git_hash)) cat("**Git commit hash:**", any_subset$git_hash, "\n\n")
+if (!is.null(any_subset$random_seed)) cat("**Random seed used for modeling and cross-validation:**", any_subset$random_seed, "\n\n")
+```
+
+---
+
+# PLS-DA Subset Analysis Overview
+
+This report provides a separate PLS-DA analysis summary for each predictor subset:
+
+- **Husbandry:** Farm management, biosecurity, and husbandry practices.
+- **Animal Health:** Animal health status and performance.
+- **Environment:** Environmental and housing conditions.
+- **Human/Contact:** Human illness history and direct/indirect contacts.
+
+---
+
+```{r subset-loop-prep, include=FALSE}
+get_subset <- function(results, name) {
+  if (!is.null(results[[name]]) && is.list(results[[name]])) results[[name]] else NULL
+}
+```
+
+---
+
+## Husbandry Predictors
+
+```{r husbandry-summary, echo=FALSE, results="asis"}
+subset_results <- get_subset(plsda_results, "Husbandry")
+if (!is.null(subset_results)) {
+  label <- "Husbandry"
+  plsda_model <- subset_results$plsda_model
+  coef_df <- subset_results$coef_df
+  loadings_df <- subset_results$loadings_df
+  scores_df <- subset_results$scores_df
+  explained_var <- subset_results$explained_var
+  ncomp_optimal <- subset_results$ncomp_optimal
+  sample_size <- subset_results$sample_size
+  predictor_count <- subset_results$predictor_count
+  original_predictor_count <- subset_results$original_predictor_count
+  date_time <- subset_results$date_time
+  author <- subset_results$author
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  if (!all(c("Comp 1", "Comp 2") %in% colnames(scores_df))) {
+    colnames(scores_df)[1:2] <- c("Comp 1", "Comp 2")
+  }
+  SIV_positive_fct <- factor(scores_df$SIV_positive, levels = c("negative", "positive"))
+  class_balance <- table(SIV_positive_fct)
+  class_balance_pct <- round(100 * class_balance / sum(class_balance), 1)
+
+  cat("### Analysis Summary\n\n")
+  cat(sprintf("- **Subset:** %s\n", label))
+  cat(sprintf("- **Sample Size:** %d\n", sample_size))
+  cat(sprintf("- **Predictors after filtering:** %d\n", predictor_count))
+  cat(sprintf("- **Optimal number of components:** %d\n", ncomp_optimal))
+  cat(sprintf("- **Variance explained by each component:** %s %%\n", paste(round(explained_var * 100, 2), collapse = ', ')))
+  cat("- **SIV Status Class Balance:**\n")
+  cat(sprintf("  - Negative: %d (%.1f%%)\n", class_balance["negative"], class_balance_pct["negative"]))
+  cat(sprintf("  - Positive: %d (%.1f%%)\n", class_balance["positive"], class_balance_pct["positive"]))
+}
+```
+
+### 1. PLS-DA Sample Scores Plot
+
+```{r husbandry-scores-plot, echo=FALSE, fig.width=8, fig.height=6, warning=FALSE, message=FALSE}
+if (!is.null(subset_results)) {
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  scores_df$SIV_positive <- factor(scores_df$SIV_positive, levels = c("negative", "positive"))
+  ggplot(scores_df, aes(x = `Comp 1`, y = `Comp 2`, color = SIV_positive)) +
+    geom_point(size = 3, alpha = 0.7) +
+    stat_ellipse(aes(group = SIV_positive), linetype = 2, size = 1) +
+    labs(title = "PLS-DA: Sample Scores by SIV Status (Husbandry)",
+         x = "Component 1",
+         y = "Component 2",
+         color = "SIV Status") +
+    theme_minimal(base_size = 16)
+}
+```
+
+### 2. RMSEP Plot (Model Validation)
+
+```{r husbandry-rmsep-plot, echo=FALSE, fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+if (!is.null(subset_results)) {
+  set.seed(subset_results$random_seed %||% 123)
+  perf_cv <- suppressWarnings(mixOmics::perf(subset_results$plsda_model, validation = "Mfold", folds = 5, progressBar = FALSE))
+  error_rate <- perf_cv$error.rate$overall
+  if (is.matrix(error_rate)) {
+    error_rate_vec <- colMeans(error_rate)
+  } else {
+    error_rate_vec <- as.numeric(error_rate)
+  }
+  rmsep_values <- sqrt(error_rate_vec)
+  comps <- seq_along(rmsep_values)
+  plot(comps, rmsep_values, type = "b", lwd = 2, col = "blue",
+       xlab = "Number of Components", ylab = "RMSEP",
+       main = "RMSEP by Number of Components (Husbandry)")
+  abline(v = subset_results$ncomp_optimal, lty = 2, col = "red")
+  text(subset_results$ncomp_optimal + 0.2, min(rmsep_values, na.rm = TRUE) + 0.02,
+       paste("Optimal:", subset_results$ncomp_optimal), col = "red")
+}
+```
+
+### 3. Risk and Protective Factors
+
+#### Component 1 Risk/Protective Factors
+
+```{r husbandry-risk-protective-factors-comp1, echo=FALSE}
+if (!is.null(subset_results)) {
+  loadings_df <- subset_results$loadings_df
+  colnames(loadings_df) <- paste0("Comp ", 1:ncol(loadings_df))
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  comp1 <- loadings_df[, "Comp 1"]
+  comp1_means <- tapply(scores_df$`Comp 1`, scores_df$SIV_positive, mean, na.rm=TRUE)
+  if (comp1_means["positive"] > comp1_means["negative"]) {
+    assign_type1 <- ifelse(comp1 > 0, "Risk Factor", "Protective Factor")
+  } else {
+    assign_type1 <- ifelse(comp1 < 0, "Risk Factor", "Protective Factor")
+  }
+  risk_factors1 <- tibble(
+    Predictor = rownames(loadings_df),
+    Loading = comp1,
+    Type = assign_type1
+  ) %>% arrange(desc(abs(Loading)))
+  DT::datatable(risk_factors1, caption = "Component 1 Risk/Protective Factors (directionally assigned)", options = list(pageLength = 10))
+}
+```
+
+#### Component 2 Risk/Protective Factors
+
+```{r husbandry-risk-protective-factors-comp2, echo=FALSE}
+if (!is.null(subset_results)) {
+  loadings_df <- subset_results$loadings_df
+  colnames(loadings_df) <- paste0("Comp ", 1:ncol(loadings_df))
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  comp2 <- loadings_df[, "Comp 2"]
+  comp2_means <- tapply(scores_df$`Comp 2`, scores_df$SIV_positive, mean, na.rm=TRUE)
+  if (comp2_means["positive"] > comp2_means["negative"]) {
+    assign_type2 <- ifelse(comp2 > 0, "Risk Factor", "Protective Factor")
+  } else {
+    assign_type2 <- ifelse(comp2 < 0, "Risk Factor", "Protective Factor")
+  }
+  risk_factors2 <- tibble(
+    Predictor = rownames(loadings_df),
+    Loading = comp2,
+    Type = assign_type2
+  ) %>% arrange(desc(abs(Loading)))
+  DT::datatable(risk_factors2, caption = "Component 2 Risk/Protective Factors (directionally assigned)", options = list(pageLength = 10))
+}
+```
+
+#### Variable Importance in Projection (VIP) Scores
+
+```{r husbandry-vip-scores-table, echo=FALSE}
+if (!is.null(subset_results)) {
+  vip_table <- subset_results$coef_df %>%
+    dplyr::select(Predictor, VIP) %>%
+    distinct(Predictor, .keep_all = TRUE) %>%
+    arrange(desc(VIP))
+  DT::datatable(
+    vip_table,
+    caption = "PLS-DA Variable Importance in Projection (VIP) Scores (sorted by importance)",
+    options = list(pageLength = 20),
+    colnames = c("Predictor", "VIP Score")
+  )
+}
+```
+
+### 4. Model Performance Summary
+
+#### Confusion Matrix
+
+```{r husbandry-confusion-matrix, echo=FALSE, results='asis'}
+subset_results <- get_subset(plsda_results, "Husbandry")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    pred_class <- pred$class$max.dist[, ncomp_optimal]
+    expected_levels <- c(FALSE, TRUE)
+    true_class <- factor(SIV_positive, levels = expected_levels)
+    pred_class <- factor(pred_class, levels = expected_levels)
+    conf_mat <- table(True = true_class, Predicted = pred_class)
+    print(knitr::kable(conf_mat, caption = "Confusion Matrix"))
+  }
+}
+```
+
+#### Performance Metrics
+
+```{r husbandry-performance-metrics, echo=FALSE, results='asis'}
+subset_results <- get_subset(plsda_results, "Husbandry")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    pred_class <- pred$class$max.dist[, ncomp_optimal]
+    expected_levels <- c(FALSE, TRUE)
+    true_class <- factor(SIV_positive, levels = expected_levels)
+    pred_class <- factor(pred_class, levels = expected_levels)
+    conf_mat <- table(True = true_class, Predicted = pred_class)
+    sens <- conf_mat["TRUE", "TRUE"] / sum(conf_mat["TRUE", ])
+    spec <- conf_mat["FALSE", "FALSE"] / sum(conf_mat["FALSE", ])
+    balanced_acc <- mean(c(sens, spec))
+    probs <- pred$predict[, "TRUE", ncomp_optimal]
+    roc_obj <- tryCatch(roc(SIV_positive, probs, levels=levels(true_class), direction="<"), error=function(e) NULL)
+    auc_value <- if (!is.null(roc_obj)) as.numeric(pROC::auc(roc_obj)) else NA
+    perf_metrics <- data.frame(
+      Metric = c("Sensitivity", "Specificity", "Balanced Accuracy", "AUC"),
+      Value = c(round(sens, 3), round(spec, 3), round(balanced_acc, 3), round(auc_value, 3))
+    )
+    print(knitr::kable(perf_metrics, caption = "Performance Metrics"))
+  }
+}
+```
+
+#### ROC Curve
+
+```{r husbandry-roc-curve, echo=FALSE, fig.width=7, fig.height=5, results='hide', warning=FALSE, message=FALSE}
+subset_results <- get_subset(plsda_results, "Husbandry")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    probs <- pred$predict[, "TRUE", ncomp_optimal]
+    roc_obj <- tryCatch(roc(SIV_positive, probs, levels=c(FALSE, TRUE), direction="<"), error=function(e) NULL)
+    if (!is.null(roc_obj)) plot(roc_obj, main = "ROC Curve (Husbandry)", col = "blue", lwd = 2)
+  }
+}
+```
+
+---
+
+## Animal Health Predictors
+
+```{r animals-summary, echo=FALSE, results="asis"}
+subset_results <- get_subset(plsda_results, "Animals")
+if (!is.null(subset_results)) {
+  label <- "Animal Health"
+  plsda_model <- subset_results$plsda_model
+  coef_df <- subset_results$coef_df
+  loadings_df <- subset_results$loadings_df
+  scores_df <- subset_results$scores_df
+  explained_var <- subset_results$explained_var
+  ncomp_optimal <- subset_results$ncomp_optimal
+  sample_size <- subset_results$sample_size
+  predictor_count <- subset_results$predictor_count
+  original_predictor_count <- subset_results$original_predictor_count
+  date_time <- subset_results$date_time
+  author <- subset_results$author
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  if (!all(c("Comp 1", "Comp 2") %in% colnames(scores_df))) {
+    colnames(scores_df)[1:2] <- c("Comp 1", "Comp 2")
+  }
+  SIV_positive_fct <- factor(scores_df$SIV_positive, levels = c("negative", "positive"))
+  class_balance <- table(SIV_positive_fct)
+  class_balance_pct <- round(100 * class_balance / sum(class_balance), 1)
+
+  cat("### Analysis Summary\n\n")
+  cat(sprintf("- **Subset:** %s\n", label))
+  cat(sprintf("- **Sample Size:** %d\n", sample_size))
+  cat(sprintf("- **Predictors after filtering:** %d\n", predictor_count))
+  cat(sprintf("- **Optimal number of components:** %d\n", ncomp_optimal))
+  cat(sprintf("- **Variance explained by each component:** %s %%\n", paste(round(explained_var * 100, 2), collapse = ', ')))
+  cat("- **SIV Status Class Balance:**\n")
+  cat(sprintf("  - Negative: %d (%.1f%%)\n", class_balance["negative"], class_balance_pct["negative"]))
+  cat(sprintf("  - Positive: %d (%.1f%%)\n", class_balance["positive"], class_balance_pct["positive"]))
+}
+```
+
+### 1. PLS-DA Sample Scores Plot
+
+```{r animals-scores-plot, echo=FALSE, fig.width=8, fig.height=6}
+if (!is.null(subset_results)) {
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  scores_df$SIV_positive <- factor(scores_df$SIV_positive, levels = c("negative", "positive"))
+  ggplot(scores_df, aes(x = `Comp 1`, y = `Comp 2`, color = SIV_positive)) +
+    geom_point(size = 3, alpha = 0.7) +
+    stat_ellipse(aes(group = SIV_positive), linetype = 2, size = 1) +
+    labs(title = "PLS-DA: Sample Scores by SIV Status (Animal Health)",
+         x = "Component 1",
+         y = "Component 2",
+         color = "SIV Status") +
+    theme_minimal(base_size = 16)
+}
+```
+
+### 2. RMSEP Plot (Model Validation)
+
+```{r animals-rmsep-plot, echo=FALSE, fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+if (!is.null(subset_results)) {
+  set.seed(subset_results$random_seed %||% 123)
+  perf_cv <- suppressWarnings(mixOmics::perf(subset_results$plsda_model, validation = "Mfold", folds = 5, progressBar = FALSE))
+  error_rate <- perf_cv$error.rate$overall
+  if (is.matrix(error_rate)) {
+    error_rate_vec <- colMeans(error_rate)
+  } else {
+    error_rate_vec <- as.numeric(error_rate)
+  }
+  rmsep_values <- sqrt(error_rate_vec)
+  comps <- seq_along(rmsep_values)
+  plot(comps, rmsep_values, type = "b", lwd = 2, col = "blue",
+       xlab = "Number of Components", ylab = "RMSEP",
+       main = "RMSEP by Number of Components (Animal Health)")
+  abline(v = subset_results$ncomp_optimal, lty = 2, col = "red")
+  text(subset_results$ncomp_optimal + 0.2, min(rmsep_values, na.rm = TRUE) + 0.02,
+       paste("Optimal:", subset_results$ncomp_optimal), col = "red")
+}
+```
+
+### 3. Risk and Protective Factors
+
+#### Component 1 Risk/Protective Factors
+
+```{r animals-risk-protective-factors-comp1, echo=FALSE}
+if (!is.null(subset_results)) {
+  loadings_df <- subset_results$loadings_df
+  colnames(loadings_df) <- paste0("Comp ", 1:ncol(loadings_df))
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  comp1 <- loadings_df[, "Comp 1"]
+  comp1_means <- tapply(scores_df$`Comp 1`, scores_df$SIV_positive, mean, na.rm=TRUE)
+  if (comp1_means["positive"] > comp1_means["negative"]) {
+    assign_type1 <- ifelse(comp1 > 0, "Risk Factor", "Protective Factor")
+  } else {
+    assign_type1 <- ifelse(comp1 < 0, "Risk Factor", "Protective Factor")
+  }
+  risk_factors1 <- tibble(
+    Predictor = rownames(loadings_df),
+    Loading = comp1,
+    Type = assign_type1
+  ) %>% arrange(desc(abs(Loading)))
+  DT::datatable(risk_factors1, caption = "Component 1 Risk/Protective Factors (directionally assigned)", options = list(pageLength = 10))
+}
+```
+#### Component 2 Risk/Protective Factors
+
+```{r animals-risk-protective-factors-comp2, echo=FALSE}
+if (!is.null(subset_results)) {
+  loadings_df <- subset_results$loadings_df
+  colnames(loadings_df) <- paste0("Comp ", 1:ncol(loadings_df))
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  comp2 <- loadings_df[, "Comp 2"]
+  comp2_means <- tapply(scores_df$`Comp 2`, scores_df$SIV_positive, mean, na.rm=TRUE)
+  if (comp2_means["positive"] > comp2_means["negative"]) {
+    assign_type2 <- ifelse(comp2 > 0, "Risk Factor", "Protective Factor")
+  } else {
+    assign_type2 <- ifelse(comp2 < 0, "Risk Factor", "Protective Factor")
+  }
+  risk_factors2 <- tibble(
+    Predictor = rownames(loadings_df),
+    Loading = comp2,
+    Type = assign_type2
+  ) %>% arrange(desc(abs(Loading)))
+  DT::datatable(risk_factors2, caption = "Component 2 Risk/Protective Factors (directionally assigned)", options = list(pageLength = 10))
+}
+```
+
+#### Variable Importance in Projection (VIP) Scores
+
+```{r animals-vip-scores-table, echo=FALSE}
+if (!is.null(subset_results)) {
+  vip_table <- subset_results$coef_df %>%
+    dplyr::select(Predictor, VIP) %>%
+    distinct(Predictor, .keep_all = TRUE) %>%
+    arrange(desc(VIP))
+  DT::datatable(
+    vip_table,
+    caption = "PLS-DA Variable Importance in Projection (VIP) Scores (sorted by importance)",
+    options = list(pageLength = 20),
+    colnames = c("Predictor", "VIP Score")
+  )
+}
+```
+
+### 4. Model Performance Summary
+
+#### Confusion Matrix
+
+```{r animals-confusion-matrix, echo=FALSE, results='asis'}
+subset_results <- get_subset(plsda_results, "Animals")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    pred_class <- pred$class$max.dist[, ncomp_optimal]
+    expected_levels <- c(FALSE, TRUE)
+    true_class <- factor(SIV_positive, levels = expected_levels)
+    pred_class <- factor(pred_class, levels = expected_levels)
+    conf_mat <- table(True = true_class, Predicted = pred_class)
+    print(knitr::kable(conf_mat, caption = "Confusion Matrix"))
+  }
+}
+```
+
+#### Performance Metrics
+
+```{r animals-performance-metrics, echo=FALSE, results='asis'}
+subset_results <- get_subset(plsda_results, "Animals")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    pred_class <- pred$class$max.dist[, ncomp_optimal]
+    expected_levels <- c(FALSE, TRUE)
+    true_class <- factor(SIV_positive, levels = expected_levels)
+    pred_class <- factor(pred_class, levels = expected_levels)
+    conf_mat <- table(True = true_class, Predicted = pred_class)
+    sens <- conf_mat["TRUE", "TRUE"] / sum(conf_mat["TRUE", ])
+    spec <- conf_mat["FALSE", "FALSE"] / sum(conf_mat["FALSE", ])
+    balanced_acc <- mean(c(sens, spec))
+    probs <- pred$predict[, "TRUE", ncomp_optimal]
+    roc_obj <- tryCatch(roc(SIV_positive, probs, levels=levels(true_class), direction="<"), error=function(e) NULL)
+    auc_value <- if (!is.null(roc_obj)) as.numeric(pROC::auc(roc_obj)) else NA
+    perf_metrics <- data.frame(
+      Metric = c("Sensitivity", "Specificity", "Balanced Accuracy", "AUC"),
+      Value = c(round(sens, 3), round(spec, 3), round(balanced_acc, 3), round(auc_value, 3))
+    )
+    print(knitr::kable(perf_metrics, caption = "Performance Metrics"))
+  }
+}
+```
+
+#### ROC Curve
+
+```{r animals-roc-curve, echo=FALSE, fig.width=7, fig.height=5, results='hide', warning=FALSE, message=FALSE}
+subset_results <- get_subset(plsda_results, "Animals")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    probs <- pred$predict[, "TRUE", ncomp_optimal]
+    roc_obj <- tryCatch(roc(SIV_positive, probs, levels=c(FALSE, TRUE), direction="<"), error=function(e) NULL)
+    if (!is.null(roc_obj)) plot(roc_obj, main = "ROC Curve (Animal Health)", col = "blue", lwd = 2)
+  }
+}
+```
+
+---
+
+## Environment Predictors
+
+```{r environment-summary, echo=FALSE, results="asis"}
+subset_results <- get_subset(plsda_results, "Environment")
+if (!is.null(subset_results)) {
+  label <- "Environment"
+  plsda_model <- subset_results$plsda_model
+  coef_df <- subset_results$coef_df
+  loadings_df <- subset_results$loadings_df
+  scores_df <- subset_results$scores_df
+  explained_var <- subset_results$explained_var
+  ncomp_optimal <- subset_results$ncomp_optimal
+  sample_size <- subset_results$sample_size
+  predictor_count <- subset_results$predictor_count
+  original_predictor_count <- subset_results$original_predictor_count
+  date_time <- subset_results$date_time
+  author <- subset_results$author
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  if (!all(c("Comp 1", "Comp 2") %in% colnames(scores_df))) {
+    colnames(scores_df)[1:2] <- c("Comp 1", "Comp 2")
+  }
+  SIV_positive_fct <- factor(scores_df$SIV_positive, levels = c("negative", "positive"))
+  class_balance <- table(SIV_positive_fct)
+  class_balance_pct <- round(100 * class_balance / sum(class_balance), 1)
+
+  cat("### Analysis Summary\n\n")
+  cat(sprintf("- **Subset:** %s\n", label))
+  cat(sprintf("- **Sample Size:** %d\n", sample_size))
+  cat(sprintf("- **Predictors after filtering:** %d\n", predictor_count))
+  cat(sprintf("- **Optimal number of components:** %d\n", ncomp_optimal))
+  cat(sprintf("- **Variance explained by each component:** %s %%\n", paste(round(explained_var * 100, 2), collapse = ', ')))
+  cat("- **SIV Status Class Balance:**\n")
+  cat(sprintf("  - Negative: %d (%.1f%%)\n", class_balance["negative"], class_balance_pct["negative"]))
+  cat(sprintf("  - Positive: %d (%.1f%%)\n", class_balance["positive"], class_balance_pct["positive"]))
+}
+```
+
+### 1. PLS-DA Sample Scores Plot
+
+```{r environment-scores-plot, echo=FALSE, fig.width=8, fig.height=6}
+if (!is.null(subset_results)) {
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  scores_df$SIV_positive <- factor(scores_df$SIV_positive, levels = c("negative", "positive"))
+  ggplot(scores_df, aes(x = `Comp 1`, y = `Comp 2`, color = SIV_positive)) +
+    geom_point(size = 3, alpha = 0.7) +
+    stat_ellipse(aes(group = SIV_positive), linetype = 2, size = 1) +
+    labs(title = "PLS-DA: Sample Scores by SIV Status (Environment)",
+         x = "Component 1",
+         y = "Component 2",
+         color = "SIV Status") +
+    theme_minimal(base_size = 16)
+}
+```
+
+### 2. RMSEP Plot (Model Validation)
+
+```{r environment-rmsep-plot, echo=FALSE, fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+if (!is.null(subset_results)) {
+  set.seed(subset_results$random_seed %||% 123)
+  perf_cv <- suppressWarnings(mixOmics::perf(subset_results$plsda_model, validation = "Mfold", folds = 5, progressBar = FALSE))
+  error_rate <- perf_cv$error.rate$overall
+  if (is.matrix(error_rate)) {
+    error_rate_vec <- colMeans(error_rate)
+  } else {
+    error_rate_vec <- as.numeric(error_rate)
+  }
+  rmsep_values <- sqrt(error_rate_vec)
+  comps <- seq_along(rmsep_values)
+  plot(comps, rmsep_values, type = "b", lwd = 2, col = "blue",
+       xlab = "Number of Components", ylab = "RMSEP",
+       main = "RMSEP by Number of Components (Environment)")
+  abline(v = subset_results$ncomp_optimal, lty = 2, col = "red")
+  text(subset_results$ncomp_optimal + 0.2, min(rmsep_values, na.rm = TRUE) + 0.02,
+       paste("Optimal:", subset_results$ncomp_optimal), col = "red")
+}
+```
+
+### 3. Risk and Protective Factors
+
+#### Component 1 Risk/Protective Factors
+
+```{r environment-risk-protective-factors-comp1, echo=FALSE}
+if (!is.null(subset_results)) {
+  loadings_df <- subset_results$loadings_df
+  colnames(loadings_df) <- paste0("Comp ", 1:ncol(loadings_df))
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  comp1 <- loadings_df[, "Comp 1"]
+  comp1_means <- tapply(scores_df$`Comp 1`, scores_df$SIV_positive, mean, na.rm=TRUE)
+  if (comp1_means["positive"] > comp1_means["negative"]) {
+    assign_type1 <- ifelse(comp1 > 0, "Risk Factor", "Protective Factor")
+  } else {
+    assign_type1 <- ifelse(comp1 < 0, "Risk Factor", "Protective Factor")
+  }
+  risk_factors1 <- tibble(
+    Predictor = rownames(loadings_df),
+    Loading = comp1,
+    Type = assign_type1
+  ) %>% arrange(desc(abs(Loading)))
+  DT::datatable(risk_factors1, caption = "Component 1 Risk/Protective Factors (directionally assigned)", options = list(pageLength = 10))
+}
+```
+
+#### Component 2 Risk/Protective Factors
+
+```{r environment-risk-protective-factors-comp2, echo=FALSE}
+if (!is.null(subset_results)) {
+  loadings_df <- subset_results$loadings_df
+  colnames(loadings_df) <- paste0("Comp ", 1:ncol(loadings_df))
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  comp2 <- loadings_df[, "Comp 2"]
+  comp2_means <- tapply(scores_df$`Comp 2`, scores_df$SIV_positive, mean, na.rm=TRUE)
+  if (comp2_means["positive"] > comp2_means["negative"]) {
+    assign_type2 <- ifelse(comp2 > 0, "Risk Factor", "Protective Factor")
+  } else {
+    assign_type2 <- ifelse(comp2 < 0, "Risk Factor", "Protective Factor")
+  }
+  risk_factors2 <- tibble(
+    Predictor = rownames(loadings_df),
+    Loading = comp2,
+    Type = assign_type2
+  ) %>% arrange(desc(abs(Loading)))
+  DT::datatable(risk_factors2, caption = "Component 2 Risk/Protective Factors (directionally assigned)", options = list(pageLength = 10))
+}
+```
+
+#### Variable Importance in Projection (VIP) Scores
+
+```{r environment-vip-scores-table, echo=FALSE}
+if (!is.null(subset_results)) {
+  vip_table <- subset_results$coef_df %>%
+    dplyr::select(Predictor, VIP) %>%
+    distinct(Predictor, .keep_all = TRUE) %>%
+    arrange(desc(VIP))
+  DT::datatable(
+    vip_table,
+    caption = "PLS-DA Variable Importance in Projection (VIP) Scores (sorted by importance)",
+    options = list(pageLength = 20),
+    colnames = c("Predictor", "VIP Score")
+  )
+}
+```
+
+### 4. Model Performance Summary
+
+#### Confusion Matrix
+
+```{r environment-confusion-matrix, echo=FALSE, results='asis'}
+subset_results <- get_subset(plsda_results, "Environment")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    pred_class <- pred$class$max.dist[, ncomp_optimal]
+    expected_levels <- c(FALSE, TRUE)
+    true_class <- factor(SIV_positive, levels = expected_levels)
+    pred_class <- factor(pred_class, levels = expected_levels)
+    conf_mat <- table(True = true_class, Predicted = pred_class)
+    print(knitr::kable(conf_mat, caption = "Confusion Matrix"))
+  }
+}
+```
+
+#### Performance Metrics
+
+```{r environment-performance-metrics, echo=FALSE, results='asis'}
+subset_results <- get_subset(plsda_results, "Environment")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    pred_class <- pred$class$max.dist[, ncomp_optimal]
+    expected_levels <- c(FALSE, TRUE)
+    true_class <- factor(SIV_positive, levels = expected_levels)
+    pred_class <- factor(pred_class, levels = expected_levels)
+    conf_mat <- table(True = true_class, Predicted = pred_class)
+    sens <- conf_mat["TRUE", "TRUE"] / sum(conf_mat["TRUE", ])
+    spec <- conf_mat["FALSE", "FALSE"] / sum(conf_mat["FALSE", ])
+    balanced_acc <- mean(c(sens, spec))
+    probs <- pred$predict[, "TRUE", ncomp_optimal]
+    roc_obj <- tryCatch(roc(SIV_positive, probs, levels=levels(true_class), direction="<"), error=function(e) NULL)
+    auc_value <- if (!is.null(roc_obj)) as.numeric(pROC::auc(roc_obj)) else NA
+    perf_metrics <- data.frame(
+      Metric = c("Sensitivity", "Specificity", "Balanced Accuracy", "AUC"),
+      Value = c(round(sens, 3), round(spec, 3), round(balanced_acc, 3), round(auc_value, 3))
+    )
+    print(knitr::kable(perf_metrics, caption = "Performance Metrics"))
+  }
+}
+```
+
+#### ROC Curve
+
+```{r environment-roc-curve, echo=FALSE, fig.width=7, fig.height=5, results='hide', warning=FALSE, message=FALSE}
+subset_results <- get_subset(plsda_results, "Environment")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    probs <- pred$predict[, "TRUE", ncomp_optimal]
+    roc_obj <- tryCatch(roc(SIV_positive, probs, levels=c(FALSE, TRUE), direction="<"), error=function(e) NULL)
+    if (!is.null(roc_obj)) plot(roc_obj, main = "ROC Curve (Environment)", col = "blue", lwd = 2)
+  }
+}
+```
+
+---
+
+## Human/Contact Predictors
+
+```{r human-summary, echo=FALSE, results="asis"}
+subset_results <- get_subset(plsda_results, "Human")
+if (!is.null(subset_results)) {
+  label <- "Human/Contact"
+  plsda_model <- subset_results$plsda_model
+  coef_df <- subset_results$coef_df
+  loadings_df <- subset_results$loadings_df
+  scores_df <- subset_results$scores_df
+  explained_var <- subset_results$explained_var
+  ncomp_optimal <- subset_results$ncomp_optimal
+  sample_size <- subset_results$sample_size
+  predictor_count <- subset_results$predictor_count
+  original_predictor_count <- subset_results$original_predictor_count
+  date_time <- subset_results$date_time
+  author <- subset_results$author
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  if (!all(c("Comp 1", "Comp 2") %in% colnames(scores_df))) {
+    colnames(scores_df)[1:2] <- c("Comp 1", "Comp 2")
+  }
+  SIV_positive_fct <- factor(scores_df$SIV_positive, levels = c("negative", "positive"))
+  class_balance <- table(SIV_positive_fct)
+  class_balance_pct <- round(100 * class_balance / sum(class_balance), 1)
+
+  cat("### Analysis Summary\n\n")
+  cat(sprintf("- **Subset:** %s\n", label))
+  cat(sprintf("- **Sample Size:** %d\n", sample_size))
+  cat(sprintf("- **Predictors after filtering:** %d\n", predictor_count))
+  cat(sprintf("- **Optimal number of components:** %d\n", ncomp_optimal))
+  cat(sprintf("- **Variance explained by each component:** %s %%\n", paste(round(explained_var * 100, 2), collapse = ', ')))
+  cat("- **SIV Status Class Balance:**\n")
+  cat(sprintf("  - Negative: %d (%.1f%%)\n", class_balance["negative"], class_balance_pct["negative"]))
+  cat(sprintf("  - Positive: %d (%.1f%%)\n", class_balance["positive"], class_balance_pct["positive"]))
+}
+```
+
+### 1. PLS-DA Sample Scores Plot
+
+```{r human-scores-plot, echo=FALSE, fig.width=8, fig.height=6}
+if (!is.null(subset_results)) {
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  scores_df$SIV_positive <- factor(scores_df$SIV_positive, levels = c("negative", "positive"))
+  ggplot(scores_df, aes(x = `Comp 1`, y = `Comp 2`, color = SIV_positive)) +
+    geom_point(size = 3, alpha = 0.7) +
+    stat_ellipse(aes(group = SIV_positive), linetype = 2, size = 1) +
+    labs(title = "PLS-DA: Sample Scores by SIV Status (Human/Contact)",
+         x = "Component 1",
+         y = "Component 2",
+         color = "SIV Status") +
+    theme_minimal(base_size = 16)
+}
+```
+
+### 2. RMSEP Plot (Model Validation)
+
+```{r human-rmsep-plot, echo=FALSE, fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+if (!is.null(subset_results)) {
+  set.seed(subset_results$random_seed %||% 123)
+  perf_cv <- suppressWarnings(mixOmics::perf(subset_results$plsda_model, validation = "Mfold", folds = 5, progressBar = FALSE))
+  error_rate <- perf_cv$error.rate$overall
+  if (is.matrix(error_rate)) {
+    error_rate_vec <- colMeans(error_rate)
+  } else {
+    error_rate_vec <- as.numeric(error_rate)
+  }
+  rmsep_values <- sqrt(error_rate_vec)
+  comps <- seq_along(rmsep_values)
+  plot(comps, rmsep_values, type = "b", lwd = 2, col = "blue",
+       xlab = "Number of Components", ylab = "RMSEP",
+       main = "RMSEP by Number of Components (Human/Contact)")
+  abline(v = subset_results$ncomp_optimal, lty = 2, col = "red")
+  text(subset_results$ncomp_optimal + 0.2, min(rmsep_values, na.rm = TRUE) + 0.02,
+       paste("Optimal:", subset_results$ncomp_optimal), col = "red")
+}
+```
+
+### 3. Risk and Protective Factors
+
+#### Component 1 Risk/Protective Factors
+
+```{r human-risk-protective-factors-comp1, echo=FALSE}
+if (!is.null(subset_results)) {
+  loadings_df <- subset_results$loadings_df
+  colnames(loadings_df) <- paste0("Comp ", 1:ncol(loadings_df))
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  comp1 <- loadings_df[, "Comp 1"]
+  comp1_means <- tapply(scores_df$`Comp 1`, scores_df$SIV_positive, mean, na.rm=TRUE)
+  if (comp1_means["positive"] > comp1_means["negative"]) {
+    assign_type1 <- ifelse(comp1 > 0, "Risk Factor", "Protective Factor")
+  } else {
+    assign_type1 <- ifelse(comp1 < 0, "Risk Factor", "Protective Factor")
+  }
+  risk_factors1 <- tibble(
+    Predictor = rownames(loadings_df),
+    Loading = comp1,
+    Type = assign_type1
+  ) %>% arrange(desc(abs(Loading)))
+  DT::datatable(risk_factors1, caption = "Component 1 Risk/Protective Factors (directionally assigned)", options = list(pageLength = 10))
+}
+```
+
+#### Component 2 Risk/Protective Factors
+
+```{r human-risk-protective-factors-comp2, echo=FALSE}
+if (!is.null(subset_results)) {
+  loadings_df <- subset_results$loadings_df
+  colnames(loadings_df) <- paste0("Comp ", 1:ncol(loadings_df))
+  scores_df <- subset_results$scores_df
+  if (!"SIV_positive" %in% colnames(scores_df)) {
+    SIV_positive <- subset_results$SIV_positive
+    if (!is.null(SIV_positive) && length(SIV_positive) == nrow(scores_df)) {
+      scores_df$SIV_positive <- factor(SIV_positive, levels = c(FALSE, TRUE), labels = c("negative", "positive"))
+    }
+  }
+  comp2 <- loadings_df[, "Comp 2"]
+  comp2_means <- tapply(scores_df$`Comp 2`, scores_df$SIV_positive, mean, na.rm=TRUE)
+  if (comp2_means["positive"] > comp2_means["negative"]) {
+    assign_type2 <- ifelse(comp2 > 0, "Risk Factor", "Protective Factor")
+  } else {
+    assign_type2 <- ifelse(comp2 < 0, "Risk Factor", "Protective Factor")
+  }
+  risk_factors2 <- tibble(
+    Predictor = rownames(loadings_df),
+    Loading = comp2,
+    Type = assign_type2
+  ) %>% arrange(desc(abs(Loading)))
+  DT::datatable(risk_factors2, caption = "Component 2 Risk/Protective Factors (directionally assigned)", options = list(pageLength = 10))
+}
+```
+
+#### Variable Importance in Projection (VIP) Scores
+
+```{r human-vip-scores-table, echo=FALSE}
+if (!is.null(subset_results)) {
+  vip_table <- subset_results$coef_df %>%
+    dplyr::select(Predictor, VIP) %>%
+    distinct(Predictor, .keep_all = TRUE) %>%
+    arrange(desc(VIP))
+  DT::datatable(
+    vip_table,
+    caption = "PLS-DA Variable Importance in Projection (VIP) Scores (sorted by importance)",
+    options = list(pageLength = 20),
+    colnames = c("Predictor", "VIP Score")
+  )
+}
+```
+
+### 4. Model Performance Summary
+
+#### Confusion Matrix
+
+```{r human-confusion-matrix, echo=FALSE, results='asis'}
+subset_results <- get_subset(plsda_results, "Human")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    pred_class <- pred$class$max.dist[, ncomp_optimal]
+    expected_levels <- c(FALSE, TRUE)
+    true_class <- factor(SIV_positive, levels = expected_levels)
+    pred_class <- factor(pred_class, levels = expected_levels)
+    conf_mat <- table(True = true_class, Predicted = pred_class)
+    print(knitr::kable(conf_mat, caption = "Confusion Matrix"))
+  }
+}
+```
+
+#### Performance Metrics
+
+```{r human-performance-metrics, echo=FALSE, results='asis'}
+subset_results <- get_subset(plsda_results, "Human")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    pred_class <- pred$class$max.dist[, ncomp_optimal]
+    expected_levels <- c(FALSE, TRUE)
+    true_class <- factor(SIV_positive, levels = expected_levels)
+    pred_class <- factor(pred_class, levels = expected_levels)
+    conf_mat <- table(True = true_class, Predicted = pred_class)
+    sens <- conf_mat["TRUE", "TRUE"] / sum(conf_mat["TRUE", ])
+    spec <- conf_mat["FALSE", "FALSE"] / sum(conf_mat["FALSE", ])
+    balanced_acc <- mean(c(sens, spec))
+    probs <- pred$predict[, "TRUE", ncomp_optimal]
+    roc_obj <- tryCatch(roc(SIV_positive, probs, levels=levels(true_class), direction="<"), error=function(e) NULL)
+    auc_value <- if (!is.null(roc_obj)) as.numeric(pROC::auc(roc_obj)) else NA
+    perf_metrics <- data.frame(
+      Metric = c("Sensitivity", "Specificity", "Balanced Accuracy", "AUC"),
+      Value = c(round(sens, 3), round(spec, 3), round(balanced_acc, 3), round(auc_value, 3))
+    )
+    print(knitr::kable(perf_metrics, caption = "Performance Metrics"))
+  }
+}
+```
+
+#### ROC Curve
+
+```{r human-roc-curve, echo=FALSE, fig.width=7, fig.height=5, results='hide', warning=FALSE, message=FALSE}
+subset_results <- get_subset(plsda_results, "Human")
+if (!is.null(subset_results)) {
+  ncomp_optimal <- subset_results$ncomp_optimal
+  plsda_model <- subset_results$plsda_model
+  X_mat <- subset_results$X
+  SIV_positive <- subset_results$SIV_positive
+  if (!is.null(X_mat) && !is.null(SIV_positive)) {
+    pred <- predict(plsda_model, X_mat, dist = "max.dist", comp = ncomp_optimal)
+    probs <- pred$predict[, "TRUE", ncomp_optimal]
+    roc_obj <- tryCatch(roc(SIV_positive, probs, levels=c(FALSE, TRUE), direction="<"), error=function(e) NULL)
+    if (!is.null(roc_obj)) plot(roc_obj, main = "ROC Curve (Human/Contact)", col = "blue", lwd = 2)
+  }
+}
+```
+
+---
+
+# Limitations
+
+- Results depend on data preprocessing, filtering, and outcome coding (see logs for details).
+- PLS-DA maximizes class separation rather than explained variance.
+- Sample size and class imbalance may affect model stability.
+- Component 2 may capture secondary patterns requiring further investigation.
+- For very large datasets, further optimization (vectorized operations, data.table package) may be warranted.
+
+---
+
+# Reproducibility: R Session Info
+
+```{r session-info, echo=FALSE}
+if (file.exists("R_sessionInfo.txt")) {
+  cat(paste(readLines("R_sessionInfo.txt"), collapse = "\n"))
+} else {
+  sessionInfo()
+}
+```
+
+---
+
+# End of Report
+
+For complete transparency, please refer to the following files:
+
+- **Analysis script:** See code version or git commit above.
+- **Filtered predictors log:** `removed_predictors_log.csv`
+- **Reference dummies log:** `removed_reference_dummies_log.csv`
+- **Standardized predictor matrix:** `model_X_<subset>_used.csv`
+- **Response variable:** `model_Y_<subset>_used.csv`
+
+If you have questions or wish to audit intermediate steps, please consult the logs and analysis script.
+
