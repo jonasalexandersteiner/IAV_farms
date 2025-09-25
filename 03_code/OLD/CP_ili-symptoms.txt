@@ -1,0 +1,18 @@
+# Subset the data to SIV_positive == TRUE only
+subset_df <- df3[df3$SIV_positive == TRUE, ]
+
+# Ensure ili_symptoms is logical or factor and has both TRUE and FALSE
+subset_df <- subset_df[!is.na(subset_df$ili_symptoms) & !is.na(subset_df$average_cp), ]
+
+# Wilcoxon test (Mann-Whitney U) for average_cp between ili_symptoms TRUE vs FALSE
+wilcox_result <- wilcox.test(average_cp ~ ili_symptoms, data = subset_df, exact = FALSE)
+
+print(wilcox_result)
+
+
+
+Wilcoxon rank sum test with continuity correction
+
+data:  average_cp by ili_symptoms
+W = 507, p-value = 0.00015
+alternative hypothesis: true location shift is not equal to 0

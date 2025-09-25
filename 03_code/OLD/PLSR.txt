@@ -1,0 +1,191 @@
+############################################################
+# SIV Risk Factor Analysis: PLS Regression and Visualization
+# -------------------------------------------------------- #
+# This script performs a complete PLS regression analysis
+# on SIV positivity in Swiss pig farms, saves results,
+# and then renders the existing R Markdown report to HTML.
+############################################################
+
+# ---- 0. Setup: Libraries ----
+library(tidyverse)
+library(pls)
+library(rmarkdown)
+library(knitr)
+library(DT)
+library(plotly)
+library(viridis)
+library(kableExtra)
+
+# ---- 1. Data Preparation ----
+# Assumes 'df3' is loaded in environment
+
+# ---- 1a. Identify factor columns ----
+all_factor_cols <- names(df3)[sapply(df3, is.factor)]
+
+# ---- 1b. Identify air quality factors (ordinal, keep as integer) ----
+air_quality_factors <- c(
+  "farrowing_air_quality",
+  "ai_sows_air_quality",
+  "gilts_air_quality",
+  "weaners_air_quality",
+  "fatteners_air_quality"
+)
+
+# ---- 1c. Factors to dummy encode (nominal) ----
+dummy_factors <- setdiff(all_factor_cols, air_quality_factors)
+
+# ---- 1d. Remove dummy factor columns that are entirely NA ----
+dummy_factors_valid <- dummy_factors[
+  sapply(df3[dummy_factors], function(x) !all(is.na(x)))
+]
+
+# ---- 1e. Dummy encode nominal factors ----
+df3_ord <- df3 %>%
+  mutate(across(all_of(air_quality_factors), ~ as.integer(as.character(.))))
+all_dummy_cols <- list()
+for (fac in dummy_factors_valid) {
+  fac_data <- df3_ord[[fac]]
+  fac_levels <- unique(fac_data[!is.na(fac_data)])
+  fac_dummies <- data.frame(row.names = 1:nrow(df3_ord))
+  for (level in fac_levels) {
+    col_name <- paste0(fac, "_", level)
+    fac_dummies[[col_name]] <- ifelse(is.na(fac_data), NA, 
+                                      ifelse(fac_data == level, 1, 0))
+  }
+  all_dummy_cols[[fac]] <- fac_dummies
+}
+dummy_df <- bind_cols(all_dummy_cols)
+df3_dummies <- df3_ord %>%
+  select(-all_of(dummy_factors_valid)) %>%
+  bind_cols(dummy_df)
+df3_dummies <- df3_dummies %>%
+  mutate(across(where(is.numeric), ~ ifelse(is.na(.), 0, .)))
+
+# ---- 1f. Remove meta-data columns and verification* columns to create predictor matrix X ----
+meta_vars <- c(
+  "farm_id", "total_no_of_samples", "no_positive_pigs",
+  "percentage_positive_pigs", "min_cp", "max_cp", "average_cp",
+  "std_dev", "date_sampling"
+)
+df3_dummies <- df3_dummies %>%
+  mutate(SIV_positive_num = as.numeric(SIV_positive))
+X <- df3_dummies %>%
+  select(
+    -all_of(c(meta_vars, "SIV_positive", "SIV_positive_num")),
+    -starts_with("verification")
+  ) %>%
+  mutate(across(where(is.logical), ~ as.numeric(.))) %>%
+  as.data.frame()
+Y <- df3_dummies %>%
+  select(SIV_positive_num) %>%
+  as.data.frame()
+
+# ---- 1g. Aggressive filtering of predictors ----
+var_info <- data.frame(
+  predictor = names(X),
+  variance = sapply(X, function(x) var(x, na.rm = TRUE)),
+  mean = sapply(X, function(x) mean(x, na.rm = TRUE)),
+  unique_values = sapply(X, function(x) length(unique(x)))
+)
+problem_idx <- which(var_info$variance < 0.01 | 
+                       var_info$unique_values <= 1 |
+                       is.na(var_info$variance) |
+                       var_info$mean < 0.05 | 
+                       var_info$mean > 0.95)
+if(length(problem_idx) > 0) {
+  X <- X[, -problem_idx, drop = FALSE]
+}
+if(ncol(X) > 50) {
+  remaining_var <- sapply(X, var)
+  top_predictors <- names(sort(remaining_var, decreasing = TRUE))[1:50]
+  X <- X[, top_predictors, drop = FALSE]
+}
+
+# ---- 2. Check if there are enough observations to fit the model ----
+if(nrow(X) <= 2 || ncol(X) < 1) {
+  stop("Not enough observations or predictors to fit a PLS model")
+}
+
+# ---- 3. Model Fitting: PLS Regression ----
+model_data <- data.frame(Y = Y$SIV_positive_num, X)
+max_comp <- min(floor(nrow(X)/10), floor(ncol(X)/10), 3)
+max_comp <- max(1, max_comp)
+set.seed(123)
+pls_model <- plsr(Y ~ ., 
+                  data = model_data, 
+                  scale = TRUE,
+                  ncomp = max_comp,
+                  method = "simpls",
+                  validation = "LOO")
+rmsep_data <- RMSEP(pls_model)$val[1,,]
+if(length(rmsep_data) > 1) {
+  ncomp_optimal <- which.min(rmsep_data)-1
+  ncomp_optimal <- max(1, min(ncomp_optimal, max_comp))
+} else {
+  ncomp_optimal <- 1
+}
+pls_coef <- coef(pls_model, ncomp = ncomp_optimal)
+coef_df <- data.frame(
+  Predictor = rownames(pls_coef),
+  Coefficient = as.numeric(pls_coef)
+) %>%
+  arrange(desc(abs(Coefficient)))
+explained_var <- explvar(pls_model)
+
+# ---- 4. Prepare predictor matrix for downstream visualization ----
+# Ensure numeric matrix with unique character row/colnames for MultBiplotR
+X_mat <- as.matrix(X)
+if (is.null(rownames(X_mat)) || !is.character(rownames(X_mat))) {
+  rownames(X_mat) <- paste0("Sample", seq_len(nrow(X_mat)))
+}
+rownames(X_mat) <- make.unique(as.character(rownames(X_mat)))
+if (is.null(colnames(X_mat)) || !is.character(colnames(X_mat))) {
+  colnames(X_mat) <- paste0("Var", seq_len(ncol(X_mat)))
+}
+colnames(X_mat) <- make.unique(as.character(colnames(X_mat)))
+
+# SIV status as factor, matching X_mat rows
+SIV_status <- as.factor(df3_dummies$SIV_positive)
+if (length(SIV_status) != nrow(X_mat)) {
+  stop("SIV_status length does not match X_mat rows")
+}
+
+# ---- 5. Save Results ----
+output_dir <- "04_output/SIV_PLS_Analysis_Results"
+if (!dir.exists(output_dir)) dir.create(output_dir)
+
+results <- list(
+  pls_model = pls_model,
+  coef_df = coef_df,
+  ncomp_optimal = ncomp_optimal,
+  explained_var = explained_var,
+  sample_size = nrow(model_data),
+  predictor_count = ncol(X_mat),
+  original_predictor_count = ncol(df3_dummies) - length(meta_vars) - 2,
+  date_time = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"),
+  author = "jonasalexandersteiner",
+  X = X_mat,
+  SIV_status = SIV_status
+)
+saveRDS(results, file.path(output_dir, "pls_analysis_results.rds"))
+
+# ---- 6. Render Existing R Markdown Report ----
+rmd_file <- file.path(output_dir, "SIV_PLS_visualization.Rmd")
+html_file <- file.path(output_dir, "SIV_PLS_Analysis_Report.html")
+
+if (!file.exists(rmd_file)) {
+  stop(paste("R Markdown file does not exist:", rmd_file))
+}
+
+rmarkdown::render(
+  input = rmd_file,
+  output_file = html_file,
+  output_dir = output_dir,
+  envir = new.env(parent = globalenv())
+)
+
+cat("Report successfully generated at:", html_file, "\n")
+
+############################################################
+# End of SIV PLS Analysis Script
+############################################################

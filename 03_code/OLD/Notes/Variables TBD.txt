@@ -1,0 +1,714 @@
+a list of all variables again that includs some more changes for the full skript, please implement them and fit in place for nice readibility and simplicity
+
+
+$farm_id
+[1] "numeric"
+mutate to integer
+
+$total_no_of_samples
+[1] "numeric"
+mutate to integer
+
+$no_positive_pigs
+[1] "numeric"
+mutate to integer
+
+$percentage_positive_pigs
+[1] "numeric"
+
+$min_cp
+[1] "numeric"
+
+$max_value
+[1] "numeric"
+
+$average_cp
+[1] "numeric"
+
+$std_dev
+[1] "numeric"
+
+$ili_symptoms
+[1] "logical"
+
+$symptomatic_report
+[1] "logical"
+
+$date_sampling
+[1] "POSIXct" "POSIXt" 
+
+$source_of_contact
+[1] "factor"
+
+$canton
+[1] "factor"
+
+$herdsize
+[1] "numeric"
+mutate to integer
+
+$other_animals
+[1] "character"
+
+$pig_closeby
+[1] "logical"
+
+$horses_closeby
+[1] "logical"
+
+$dogs_closeby
+[1] "logical"
+
+$chicken_closeby
+[1] "logical"
+
+$turkey_closeby
+[1] "logical"
+
+$cattle_closeby
+[1] "logical"
+
+$cats_closeby
+[1] "logical"
+
+$production_type
+[1] "factor"
+
+$sgd_qgs
+[1] "factor"
+
+$farrowing_on_farm
+[1] "logical"
+
+$isemination_on_farm
+[1] "logical"
+
+$gestation_on_farm
+[1] "logical"
+
+$weaners_on_farm
+[1] "logical"
+
+$fattening_on_farm
+[1] "logical"
+
+$number_suckling_piglets
+[1] "numeric"
+mutate to integer
+
+$number_weaners
+[1] "numeric"
+mutate to integer
+
+$number_fattening_pigs
+[1] "numeric"
+mutate to integer
+
+$number_young_sows
+[1] "numeric"
+mutate to integer
+
+$number_old_sows
+[1] "numeric"
+mutate to integer
+
+$number_boars
+[1] "numeric"
+mutate to integer
+
+$number_of_origins
+[1] "numeric"
+mutate to integer
+
+$number_of_origins_suckiling_piglets
+[1] "numeric"
+mutate to integer
+
+$number_of_origins_weaners
+[1] "numeric"
+mutate to integer
+
+$number_of_origins_fattening_pigs
+[1] "numeric"
+mutate to integer
+
+$number_of_origins_young_sows
+[1] "numeric"
+mutate to integer
+
+$number_of_origins_old_sows
+[1] "numeric"
+mutate to integer
+
+$number_of_origins_boars
+[1] "numeric"
+mutate to integer
+
+$quarantaine_concept
+[1] "logical"
+
+$quarantaine_suckling_piglets
+[1] "logical"
+
+$quarantaine_weaners
+[1] "logical"
+
+$quarantaine_fatteners
+[1] "logical"
+
+$quarantaine_young_sows
+[1] "logical"
+
+$quarantaine_old_sows
+[1] "logical"
+
+$quarantaine_boars
+[1] "logical"
+
+$quarantaine_time
+[1] "numeric"
+mutate to integer
+
+$quarantaine_in_herd_contact
+[1] "logical"
+
+$herds_of_origin_respiratory_symptoms
+[1] "logical"
+
+$herds_of_origin_influenza_diagnosis
+[1] "logical"
+
+$production_cycle
+[1] "numeric"
+mutate to integer
+
+$mode_stable_occupation_ai_centre
+[1] "factor"
+
+$mode_stable_occupation_gilts_stable
+[1] "factor"
+
+$mode_stable_occupation_farrowing_stable
+[1] "factor"
+
+$litter_equalization_farrowing_stable
+[1] "factor"
+
+$mode_stable_occupation_weaner_stable
+[1] "factor"
+
+$mode_stable_occupation_fattener_stable
+[1] "factor"
+
+$passing_through_other_age_group
+[1] "logical"
+
+$outside_area_ai_centre
+[1] "logical"
+
+$outside_area_gilts_stable
+[1] "logical"
+
+$outside_area_farrowing_stable
+[1] "logical"
+
+$outside_area_weaner_stable
+[1] "logical"
+
+$outside_area_fattener_stable
+[1] "logical"
+
+$outside_area_contact_poultry
+[1] "logical"
+
+$outside_area_contact_wild_birds
+[1] "logical"
+
+$outside_area_contact_wild_boars
+[1] "logical"
+
+$contact_poultry_in_stable
+[1] "logical"
+
+$cleaning_ai_centre
+[1] "factor"
+
+$cleaning_gilts_stable
+[1] "factor"
+
+$cleaning_farrowing_stable
+[1] "factor"
+
+$cleaning_weaner_stable
+[1] "factor"
+
+$cleaning_fattener_stable
+[1] "factor"
+
+$cleaning_quarantaine
+[1] "factor"
+
+$desinfection_ai_centre
+[1] "factor"
+
+$desinfection_gilts_stable
+[1] "factor"
+
+$desinfection_farrowing_stable
+[1] "factor"
+
+$desinfection_weaner_stable
+[1] "factor"
+
+$desinfection_fattener_stable
+[1] "factor"
+
+$desinfection_quarantaine
+[1] "factor"
+
+$drying_ai_centre
+[1] "factor"
+
+$drying_gilts_stable
+[1] "factor"
+
+$drying_farrowing_stable
+[1] "factor"
+
+$drying_weaner_stable
+[1] "factor"
+
+$drying_fattener_stable
+[1] "factor"
+
+$drying_quarantaine
+[1] "factor"
+
+$cleaning_desinfection_transport_vehicle
+[1] "factor"
+
+$cleaning_shipment_area
+[1] "factor"
+
+$caretaker_type
+[1] "factor"
+
+$caretaker_number
+[1] "numeric"
+
+$caretaker_ppe_stable
+[1] "factor"
+
+$caretaker_ppe_washing_interval
+[1] "factor"
+
+$caretaker_ppe_per_unit
+[1] "factor"
+
+$caretaker_per_unit
+[1] "logical"
+
+$caretaker_work_flow_hygiene_between_units
+[1] "logical"
+
+$caretaker_entry_ppe_only
+[1] "logical"
+
+$caretaker_disease_management
+[1] "factor"
+
+$caretaker_hands_washed_before_entry
+[1] "logical"
+
+$caretaker_boot_desinfection
+[1] "factor"
+
+$caretaker_contact_other_pigs
+[1] "factor"
+
+$caretaker_contact_poultry
+[1] "factor"
+
+$visitors_in_stable
+[1] "factor"
+
+$visitors_6_months
+[1] "numeric"
+mutate to integer
+
+$visitors_cumulative_contact_hours
+[1] "numeric"
+
+$visitors_list
+[1] "logical"
+
+$ppe_visitors
+[1] "factor"
+
+$visitors_hands_washed_before_entry
+[1] "logical"
+
+$visitors_disease_management
+[1] "factor"
+
+$visitors_contact_other_pigs
+[1] "factor"
+
+$visitors_contact_poultry
+[1] "factor"
+
+$visitors_respiratory_symptoms
+[1] "logical"
+
+$return_to_service_rate
+[1] "factor"
+
+$farrowing_rate
+[1] "factor"
+
+$piglets_per_sow_year
+[1] "factor"
+
+$abortions_per_sow_year
+[1] "factor"
+
+$piglet_mortality
+[1] "factor"
+
+$growing_rate_weaners
+[1] "factor"
+
+$growing_rate_fatteners
+[1] "factor"
+
+$feed_conversion_rate_weaners
+[1] "factor"
+
+$feed_conversion_rate_fatteners
+[1] "factor"
+
+$respiratory_history_swine
+[1] "factor"
+
+$time_respiratory_disease
+[1] "factor"
+
+$frequency_respiratory_disease_outbreaks
+[1] "character"
+
+$frequency_respi_outbreak
+[1] "factor"
+
+$start_time_current_outbreak
+[1] "numeric"
+mutate to integer
+
+$outbreak_since_examination
+[1] "logical"
+
+$outbreak_since_examination_description
+[1] "character"
+remove
+
+$percent_diseased_suckling_piglets
+[1] "numeric"
+
+$percent_diseased_weaners
+[1] "numeric"
+
+$percent_diseased_fatteners
+[1] "numeric"
+
+$percent_diseased_young_sows
+[1] "numeric"
+
+$percent_diseased_old_sows
+[1] "numeric"
+
+$percent_diseased_boars
+[1] "numeric"
+
+$killed_suckling_piglets
+[1] "logical"
+
+$killed_weaners
+[1] "logical"
+
+$killed_fatteners
+[1] "logical"
+
+$killed_young_sows
+[1] "logical"
+
+$symptom_type_swine
+[1] "character"
+
+$symptom_swine_sneezing
+[1] "logical"
+
+$symptom_swine_coughing
+[1] "logical"
+
+$symptom_swine_nasal_discharge
+[1] "logical"
+
+$symptom_swine_fever
+[1] "logical"
+
+$symptom_swine_feed_intake_red
+[1] "logical"
+
+$symptom_swine_apathy
+[1] "logical"
+
+$symptom_swine_dyspnoea
+[1] "logical"
+
+$vet_consultation
+[1] "logical"
+
+$influenza_diagnosis
+[1] "logical"
+
+$influenza_vaccination
+[1] "logical"
+
+$respiratory_history_human
+[1] "logical"
+
+$respiratory_history_contact_person
+[1] "logical"
+
+$starting_point_current_disease
+[1] "numeric"
+mutate to integer
+
+$symptom_type_human
+[1] "character"
+
+$symptom_human_sneezing
+[1] "logical"
+
+$symptom_human_coughing
+[1] "logical"
+
+$symptom_human_nasal_discharge
+[1] "logical"
+
+$symptom_human_fever
+[1] "logical"
+
+$symptom_human_feed_intake_red
+[1] "logical"
+
+$symptom_human_apathy
+[1] "logical"
+
+$symptom_human_dyspnoea
+[1] "logical"
+
+$symptom_severity
+[1] "factor"
+
+$physician_consultation
+[1] "logical"
+
+$influenza_diagnosis_human
+[1] "logical"
+
+$flu_vaccination
+[1] "logical"
+
+$flu_vaccination_contacts
+[1] "logical"
+
+$chronic_disease_conditon
+[1] "logical"
+
+$smoker
+[1] "logical"
+
+$age_group_weeks
+[1] "character"
+
+$Age_weeks_factor
+[1] "character"
+
+$seperation_between_production_units
+[1] "factor"
+
+$seperation_within_production_units
+[1] "factor"
+
+$seperation_quarantaine_area
+[1] "factor"
+
+$bird_nests
+[1] "logical"
+
+$verification_outside_area_contact_poultry
+[1] "logical"
+
+$verification_outside_area_contact_wild_birds
+[1] "logical"
+
+$verification_contact_poultry_stable
+[1] "logical"
+
+$verification_outside_area_contact_wild_boars
+[1] "logical"
+
+$farrowing_sows_coughing
+[1] "logical"
+
+$farrowing_sows_nasal_discharge
+[1] "numeric"
+
+$farrowing_piglets_reduced_general_wellbeing
+[1] "logical"
+
+$farrowing_piglet_litters_sneezing_percentage
+[1] "numeric"
+
+$farrowing_piglet_litters_coughing_percentage
+[1] "numeric"
+
+$farrowing_piglets_rectal_temperature
+[1] "numeric"
+
+$farrowing_room_temperature
+[1] "numeric"
+
+$farrowing_nest_temperature_ok
+[1] "logical"
+
+$farrowing_airflow
+[1] "numeric"
+
+$farrowing_air_quality
+[1] "factor"
+
+$farrowing_airspace_with_other_agegroup
+[1] "factor"
+
+$ai_sows_rectal_temperature
+[1] "character"
+
+$ai_sows_room_temperature
+[1] "numeric"
+
+$ai_sows_airflow
+[1] "numeric"
+
+$ai_sows_air_quality
+[1] "factor"
+
+$ai_airspace_with_other_agegroup
+[1] "factor"
+
+$gilts_reduced_general_wellbeing
+[1] "logical"
+
+$gilts_sneezing
+[1] "logical"
+
+$gilts_coughing
+[1] "logical"
+
+$gilts_qm_per_animal
+[1] "numeric"
+
+$gitls_animals_per_water_source
+[1] "numeric"
+
+$gilts_room_temperature
+[1] "numeric"
+
+$gilts_airflow
+[1] "numeric"
+
+$gilts_air_quality
+[1] "factor"
+
+$gilts_airspace_with_other_agegroup
+[1] "factor"
+
+$weaners_reduced_general_wellbeing
+[1] "numeric"
+
+$weaners_sneezing
+[1] "numeric"
+
+$weaners_coughing
+[1] "numeric"
+
+$weaners_discharge
+[1] "numeric"
+
+$weaners_rectal_temperature
+[1] "numeric"
+
+$weaners_qm_per_animal
+[1] "numeric"
+
+$weaners_animals_per_feeding_site
+[1] "character"
+
+$weaners_animals_per_feeding_site_factor
+[1] "factor"
+this replaces weaners_animals_per_feeding_site
+
+$weaners_animals_per_water_source
+[1] "numeric"
+
+$weaners_delta_room_temperature
+[1] "numeric"
+
+$weaners_airflow
+[1] "numeric"
+
+$weaners_air_quality
+[1] "factor"
+
+$weaners_airspace_with_other_agegroup
+[1] "factor"
+
+$fatteners_reduced_general_wellbeing
+[1] "numeric"
+
+$fatteners_sneezing
+[1] "numeric"
+
+$fatteners_coughing
+[1] "numeric"
+
+$fatteners_discharge
+[1] "numeric"
+
+$fatteners_rectal_temperature
+[1] "numeric"
+
+$fatteners_qm_per_animal
+[1] "numeric"
+
+$fatteners_feeding_site_width_per_animal
+[1] "character"
+
+$fatteners_feeding_site_per_animal_factor
+[1] "factor"
+this replaces fatteners_feeding_site_width_per_animal
+
+$fatteners_animals_per_water_source
+[1] "numeric"
+
+$fatteners_room_temperature
+[1] "numeric"
+
+$fatteners_airflow
+[1] "numeric"
+
+$fatteners_air_quality
+[1] "factor"
+
+$fatteners_airspace_with_other_agegroup
+[1] "factor"

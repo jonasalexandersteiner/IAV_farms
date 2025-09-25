@@ -1,0 +1,161 @@
+
+# =====================================================================
+# INFERENTIAL ANALYSIS: Association with SIV_positive (Interactive Table)
+# ---------------------------------------------------------------------
+# This script performs univariate association testing for all variables
+# in df3 (excluding specified variables) vs. the binary outcome SIV_positive.
+# It robustly chooses the appropriate statistical test for each variable,
+# corrects for multiple testing, and outputs a fully interactive HTML table.
+# Each step is annotated for clarity and reproducibility.
+# ---------------------------------------------------------------------
+
+# ---------------------------------------------------------------------
+# 1. HELPER FUNCTION: Categorical Variable Testing (Chi-squared/Fisher)
+# ---------------------------------------------------------------------
+chisq_or_fisher <- function(x, y) {
+  tbl <- table(x, y)
+  row_totals <- rowSums(tbl)
+  col_totals <- colSums(tbl)
+  grand_total <- sum(tbl)
+  expected <- outer(row_totals, col_totals) / grand_total
+  if (any(expected < 5)) {
+    test_type <- "Fisher's exact"
+    pval <- tryCatch(fisher.test(tbl)$p.value, error = function(e) NA)
+  } else {
+    test_type <- "Chi-squared"
+    pval <- tryCatch(chisq.test(tbl)$p.value, error = function(e) NA)
+  }
+  crosstab <- paste(capture.output(print(tbl)), collapse = "<br>")
+  list(test = test_type, pval = pval, crosstab = crosstab)
+}
+
+# ---------------------------------------------------------------------
+# 2. HELPER FUNCTION: Numeric Variable Testing (t-test/Wilcoxon)
+# ---------------------------------------------------------------------
+get_num_test <- function(x, y, var_name) {
+  idx <- rep(TRUE, length(x))
+  if (var_name == "herdsize") idx <- x != max(x, na.rm=TRUE)
+  if (var_name == "number_suckling_piglets") idx <- x != max(x, na.rm=TRUE)
+  if (var_name == "number_weaners") idx <- x <= 1000
+  if (var_name == "number_young_sows") idx <- x <= 100
+  if (var_name == "number_old_sows") idx <- x <= 400
+  if (var_name == "gitls_animals_per_water_source") idx <- x <= 25
+  if (var_name == "fatteners_qm_per_animal") idx <- x <= 4
+  if (var_name == "fatteners_animals_per_water_source") idx <- x <= 30
+  x <- x[idx]
+  y <- y[idx]
+  wilcox_vars <- c("number_fattening_pigs","number_boars","number_of_origins","quarantaine_time",
+                   "production_cycle","caretaker_number","visitors_in_stable_recent","visitors_cumulative_contact_hours",
+                   "start_time_current_outbreak","farrowing_airflow","ai_sows_airflow",
+                   "gilts_qm_per_animal","gilts_airflow",
+                   "weaners_sneezing","weaners_coughing","weaners_rectal_temperature","weaners_qm_per_animal",
+                   "weaners_animals_per_feeding_site_factor","weaners_animals_per_water_source","weaners_airflow","weaners_air_quality","weaners_airspace_with_other_agegroup",
+                   "fatteners_reduced_general_wellbeing","fatteners_sneezing","fatteners_coughing","fatteners_discharge","fatteners_airflow","fatteners_air_quality","fatteners_airspace_with_other_agegroup",
+                   "fatteners_feeding_site_per_animal_factor",
+                   "starting_point_current_disease",
+                   "farrowing_piglet_litters_sneezing_percentage",
+                   "farrowing_piglet_litters_coughing_percentage")
+  ttest_vars <- c("herdsize","number_suckling_piglets","number_weaners","number_young_sows","number_old_sows",
+                  "gitls_animals_per_water_source","gilts_room_temperature",
+                  "weaners_room_temperature","fatteners_rectal_temperature","fatteners_qm_per_animal",
+                  "fatteners_animals_per_water_source","fatteners_room_temperature",
+                  "farrowing_room_temperature","ai_sows_room_temperature")
+  if (var_name %in% wilcox_vars) {
+    test_type <- "Wilcoxon Mann-Whitney"
+    pval <- tryCatch(wilcox.test(x ~ y, exact = FALSE)$p.value, error = function(e) NA)
+  } else if (var_name %in% ttest_vars) {
+    test_type <- "t-test"
+    pval <- tryCatch(t.test(x ~ y)$p.value, error = function(e) NA)
+  } else {
+    test_type <- "Not analyzable"
+    pval <- NA
+  }
+  mean_T <- mean(x[y == TRUE], na.rm = TRUE)
+  mean_F <- mean(x[y == FALSE], na.rm = TRUE)
+  median_T <- median(x[y == TRUE], na.rm = TRUE)
+  median_F <- median(x[y == FALSE], na.rm = TRUE)
+  stat_summary <- paste0("mean (SIV+): ", signif(mean_T, 3), ", median (SIV+): ", signif(median_T, 3),
+                         "; mean (SIV−): ", signif(mean_F, 3), ", median (SIV−): ", signif(median_F, 3))
+  list(test = test_type, pval = pval, summary = stat_summary)
+}
+
+# ---------------------------------------------------------------------
+# 3. MAIN FUNCTION: Choose Test & Collect Metadata
+# ---------------------------------------------------------------------
+perform_test <- function(var, outcome, var_name) {
+  df <- data.frame(x = var, y = outcome)
+  df <- df[complete.cases(df), ]
+  df$y <- factor(df$y, levels = c(FALSE, TRUE))
+  if (is.logical(df$x)) df$x <- factor(df$x, levels = c(FALSE, TRUE))
+  na_pct <- mean(is.na(var)) * 100
+  var_class <- class(var)
+  var_levels <- if (is.factor(var) | is.logical(var)) {
+    paste0(levels(factor(var, levels = c(FALSE, TRUE))), collapse = ", ")
+  } else {
+    "continuous"
+  }
+  if (is.factor(var) | is.logical(var)) {
+    res <- chisq_or_fisher(df$x, df$y)
+    test_type <- res$test
+    pval <- res$pval
+    stat_summary <- res$crosstab
+  } else if (is.numeric(var)) {
+    res <- get_num_test(df$x, df$y, var_name)
+    test_type <- res$test
+    pval <- res$pval
+    stat_summary <- res$summary
+  } else {
+    test_type <- "Not analyzable"
+    pval <- NA
+    stat_summary <- "NA"
+  }
+  list(
+    variable = var_name,
+    class = var_class[1],
+    levels = var_levels,
+    pct_NA = round(na_pct, 1),
+    test = test_type,
+    pval = pval,
+    summary = stat_summary
+  )
+}
+
+# ---------------------------------------------------------------------
+# 4. VARIABLE SELECTION
+# ---------------------------------------------------------------------
+exclude_vars <- c("farm_id", "SIV_positive", "total_no_of_samples", "no_positive_pigs",
+                  "percentage_positive_pigs", "min_cp", "max_cp", "average_cp",
+                  "std_dev", "date_sampling")
+vars <- names(df3)
+vars_to_test <- setdiff(vars, exclude_vars)
+outcome_var <- "SIV_positive"
+
+# ---------------------------------------------------------------------
+# 5. RUN INFERENTIAL TESTS FOR EACH VARIABLE
+# ---------------------------------------------------------------------
+test_results <- map(vars_to_test, ~perform_test(df3[[.x]], df3[[outcome_var]], .x))
+results_df <- bind_rows(test_results)
+
+# ---------------------------------------------------------------------
+# 6. MULTIPLE TESTING CORRECTION
+# ---------------------------------------------------------------------
+results_df$pval_adj <- p.adjust(results_df$pval, method = "BH")
+
+# ---------------------------------------------------------------------
+# 7. INTERACTIVE HTML TABLE OUTPUT
+# ---------------------------------------------------------------------
+datatable_out <- results_df %>%
+  mutate(
+    pval = signif(pval, 3),
+    pval_adj = signif(pval_adj, 3)
+  ) %>%
+  select(variable, class, levels, pct_NA, test, pval, pval_adj, summary) %>%
+  DT::datatable(
+    caption = "Association with SIV_positive (FDR-corrected)",
+    filter = "top",
+    rownames = FALSE,
+    escape = FALSE,
+    options = list(pageLength = 25, autoWidth = TRUE)
+  )
+
+DT::saveWidget(datatable_out, "association_siv_positive_interactive_table.html", selfcontained = TRUE)
