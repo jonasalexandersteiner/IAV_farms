@@ -1,0 +1,9 @@
+Metric;Value;Subset
+Sensitivity;0.53;Husbandry
+Specificity;0.82;Husbandry
+Balanced Accuracy;0.67;Husbandry
+AUC;0.76;Husbandry
+Sensitivity;0.43;Animal Health
+Specificity;0.92;Animal Health
+Balanced Accuracy;0.68;Animal Health
+AUC;0.72;Animal Health

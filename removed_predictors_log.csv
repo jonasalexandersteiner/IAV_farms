@@ -1,0 +1,127 @@
+"Predictor","Reason","DuplicateOf","AliasedWith"
+"average_daily_weight_gain_fattening_pigs","Near-zero or zero variance",NA,NA
+"ai_sows_rectal_temperature","Near-zero or zero variance",NA,NA
+"rectal_temperature_max_NA","Near-zero or zero variance",NA,NA
+"rectal_temperature_avg_NA","Near-zero or zero variance",NA,NA
+"rectal_temperature_avg_>=41.0","Near-zero or zero variance",NA,NA
+"rectal_temperature_avg_40.5–<41.0","Near-zero or zero variance",NA,NA
+"source_of_contact_grouped_Vetteam Willisau","Near-zero or zero variance",NA,NA
+"source_of_contact_grouped_Tezet MÃ¼llheim","Near-zero or zero variance",NA,NA
+"turkey_closeby_TRUE","Near-zero or zero variance",NA,NA
+"quarantine_time_5","Near-zero or zero variance",NA,NA
+"quarantine_time_2","Near-zero or zero variance",NA,NA
+"herds_of_origin_respiratory_symptoms_TRUE","Near-zero or zero variance",NA,NA
+"herds_of_origin_influenza_diagnosis_TRUE","Near-zero or zero variance",NA,NA
+"disinfection_quarantine_TRUE","Near-zero or zero variance",NA,NA
+"cleaning_shipment_area_NA","Near-zero or zero variance",NA,NA
+"caretaker_ppe_washing_interval_NA","Near-zero or zero variance",NA,NA
+"caretaker_disease_management_NA","Near-zero or zero variance",NA,NA
+"visitors_list_TRUE","Near-zero or zero variance",NA,NA
+"visitors_disease_management_TRUE","Near-zero or zero variance",NA,NA
+"visitors_respiratory_symptoms_TRUE","Near-zero or zero variance",NA,NA
+"young_sows_diseased_TRUE","Near-zero or zero variance",NA,NA
+"old_sows_diseased_TRUE","Near-zero or zero variance",NA,NA
+"boars_diseased_TRUE","Near-zero or zero variance",NA,NA
+"report_killed_suckling_piglets_TRUE","Near-zero or zero variance",NA,NA
+"report_killed_weaners_TRUE","Near-zero or zero variance",NA,NA
+"report_killed_fattening_pigs_TRUE","Near-zero or zero variance",NA,NA
+"report_killed_young_sows_TRUE","Near-zero or zero variance",NA,NA
+"report_killed_old_sows_TRUE","Near-zero or zero variance",NA,NA
+"influenza_diagnosis_TRUE","Near-zero or zero variance",NA,NA
+"influenza_vaccination_TRUE","Near-zero or zero variance",NA,NA
+"symptom_human_brobchitis_TRUE","Near-zero or zero variance",NA,NA
+"symptom_human_pneumonia_TRUE","Near-zero or zero variance",NA,NA
+"symptom_human_myalgia_TRUE","Near-zero or zero variance",NA,NA
+"symptom_severity_TRUE","Near-zero or zero variance",NA,NA
+"physician_consultation_TRUE","Near-zero or zero variance",NA,NA
+"Age_weeks_factor_0-4w","Near-zero or zero variance",NA,NA
+"Age_weeks_factor_mixed_ages>10w","Near-zero or zero variance",NA,NA
+"seperation_quarantine_area_NA","Near-zero or zero variance",NA,NA
+"farrowing_sows_coughing_TRUE","Near-zero or zero variance",NA,NA
+"farrowing_piglets_reduced_general_wellbeing_TRUE","Near-zero or zero variance",NA,NA
+"farrowing_room_temperature_23–26","Near-zero or zero variance",NA,NA
+"farrowing_room_temperature_>26","Near-zero or zero variance",NA,NA
+"ai_sows_room_temperature_21–<24","Near-zero or zero variance",NA,NA
+"gestation_sows_air_quality_3","Near-zero or zero variance",NA,NA
+"weaners_reduced_general_wellbeing_TRUE","Near-zero or zero variance",NA,NA
+"weaners_discharge_TRUE","Near-zero or zero variance",NA,NA
+"weaners_animals_per_water_source_>=40","Near-zero or zero variance",NA,NA
+"fattening_pigs_sneezing_2–<5","Near-zero or zero variance",NA,NA
+"fattening_pigs_sneezing_5+","Near-zero or zero variance",NA,NA
+"fattening_pigs_coughing_2–<5","Near-zero or zero variance",NA,NA
+"fattening_pigs_discharge_TRUE","Near-zero or zero variance",NA,NA
+"fattening_pigs_qm_per_animal_<0.5","Near-zero or zero variance",NA,NA
+"fattening_pigs_room_temperature_>=25","Near-zero or zero variance",NA,NA
+"fattening_pigs_room_temperature_10","Near-zero or zero variance",NA,NA
+"Gestation_on_farm_TRUE","Duplicate predictor","Isemination_on_farm_TRUE",NA
+"mode_stable_occupation_farrowing_stable_NA","Duplicate predictor","production_type_factor_1",NA
+"cross_fostering_farrowing_stable_NA","Duplicate predictor","production_type_factor_1",NA
+"cleaning_farrowing_stable_NA","Duplicate predictor","production_type_factor_1",NA
+"disinfection_ai_centre_NA","Duplicate predictor","cleaning_ai_centre_NA",NA
+"disinfection_gestation_stable_NA","Duplicate predictor","cleaning_gestation_stable_NA",NA
+"disinfection_weaner_stable_NA","Duplicate predictor","cleaning_weaner_stable_NA",NA
+"disinfection_quarantine_NA","Duplicate predictor","cleaning_quarantine_NA",NA
+"drying_ai_centre_NA","Duplicate predictor","cleaning_ai_centre_NA",NA
+"drying_gestation_stable_NA","Duplicate predictor","cleaning_gestation_stable_NA",NA
+"drying_farrowing_stable_NA","Duplicate predictor","production_type_factor_1",NA
+"drying_weaner_stable_NA","Duplicate predictor","cleaning_weaner_stable_NA",NA
+"drying_quarantine_NA","Duplicate predictor","cleaning_quarantine_NA",NA
+"abortions_per_sow_year_NA","Duplicate predictor","piglets_per_sow_year_NA",NA
+"farrowing_piglets_reduced_general_wellbeing_NA","Duplicate predictor","farrowing_sows_coughing_NA",NA
+"gestation_sows_animals_per_water_source_NA","Duplicate predictor","gestation_sows_qm_per_animal_NA",NA
+"gestation_sows_airspace_with_other_agegroup_NA","Duplicate predictor","gestation_sows_air_quality_NA",NA
+"weaners_coughing_NA","Duplicate predictor","weaners_sneezing_NA",NA
+"weaners_discharge_NA","Duplicate predictor","weaners_reduced_general_wellbeing_NA",NA
+"weaners_qm_per_animal_NA","Duplicate predictor","weaners_reduced_general_wellbeing_NA",NA
+"weaners_animals_per_feeding_site_factor_NA","Duplicate predictor","weaners_reduced_general_wellbeing_NA",NA
+"weaners_animals_per_water_source_NA","Duplicate predictor","weaners_reduced_general_wellbeing_NA",NA
+"weaners_air_quality_NA","Duplicate predictor","weaners_reduced_general_wellbeing_NA",NA
+"weaners_airspace_with_other_agegroup_NA","Duplicate predictor","weaners_reduced_general_wellbeing_NA",NA
+"fattening_pigs_coughing_NA","Duplicate predictor","fattening_pigs_sneezing_NA",NA
+"fattening_pigs_discharge_NA","Duplicate predictor","fattening_pigs_reduced_general_wellbeing_NA",NA
+"fattening_pigs_feeding_site_per_animal_factor_NA","Duplicate predictor","fattening_pigs_reduced_general_wellbeing_NA",NA
+"fattening_pigs_air_quality_NA","Duplicate predictor","fattening_pigs_reduced_general_wellbeing_NA",NA
+"fattening_pigs_airspace_with_other_agegroup_1","Duplicate predictor","mode_stable_occupation_weaner_stable_NA",NA
+"fattening_pigs_airspace_with_other_agegroup_NA","Duplicate predictor","fattening_pigs_reduced_general_wellbeing_NA",NA
+"Group_Farm with symptom report","Duplicate predictor","symptomatic_report_TRUE",NA
+"farrowing_piglet_litters_sneezing_NA","Duplicate predictor","farrowing_sows_coughing_NA",NA
+"farrowing_piglet_litters_coughing_NA","Duplicate predictor","farrowing_sows_coughing_NA",NA
+"source_of_contact_grouped_Jean-Luc Charbon","High correlation (>0.95)",NA,NA
+"mode_stable_occupation_weaner_stable_NA","High correlation (>0.95)",NA,NA
+"cleaning_ai_centre_NA","High correlation (>0.95)",NA,NA
+"cleaning_gestation_stable_NA","High correlation (>0.95)",NA,NA
+"disinfection_farrowing_stable_NA","High correlation (>0.95)",NA,NA
+"piglet_mortality_NA","High correlation (>0.95)",NA,NA
+"farrowing_air_quality_NA","High correlation (>0.95)",NA,NA
+"fattening_pigs_animals_per_water_source_NA","High correlation (>0.95)",NA,NA
+"production_type_factor_1","High correlation (>0.95)",NA,NA
+"cleaning_fattening_stable_NA","High correlation (>0.95)",NA,NA
+"farrowing_rate_NA","High correlation (>0.95)",NA,NA
+"piglets_per_sow_year_NA","High correlation (>0.95)",NA,NA
+"Farrowing_on_farm_TRUE","High correlation (>0.95)",NA,NA
+"farrowing_sows_coughing_NA","High correlation (>0.95)",NA,NA
+"ai_sows_room_temperature_NA","High correlation (>0.95)",NA,NA
+"ai_sows_air_quality_NA","High correlation (>0.95)",NA,NA
+"mode_stable_occupation_gestation_stable_NA","High correlation (>0.95)",NA,NA
+"gestation_sows_room_temperature_NA","High correlation (>0.95)",NA,NA
+"gestation_sows_qm_per_animal_NA","High correlation (>0.95)",NA,NA
+"fattening_pigs_room_temperature_NA","High correlation (>0.95)",NA,NA
+"symptomatic_report_TRUE","High correlation (>0.95)",NA,NA
+"number_weaners","Remove as explained by herdsize",NA,NA
+"number_suckling_piglets","Remove as explained by herdsize",NA,NA
+"number_old_sows","Remove as explained by herdsize",NA,NA
+"number_young_sows","Remove as explained by herdsize",NA,NA
+"number_fattening_pigs","Remove as explained by herdsize",NA,NA
+"number_boars","Remove as explained by herdsize",NA,NA
+"visitors_in_stable_recent","Remove as also explained by cumulative hours",NA,NA
+"outside_area_ai_centre_TRUE","Remove as explained by overview variable",NA,NA
+"outside_area_gestation_stable_TRUE","Remove as explained by overview variable",NA,NA
+"outside_area_farrowing_stable_TRUE","Remove as explained by overview variable",NA,NA
+"outside_area_weaner_stable_TRUE","Remove as explained by overview variable",NA,NA
+"starting_point_current_disease","Remove as explained by respiratory_history_human",NA,NA
+"start_time_current_outbreak","Remove as explained by respiratory_history_swine",NA,NA
+"source_of_contact_grouped_Private Contact","Remove: all source_of_contact vars - not of interest here",NA,NA
+"source_of_contact_grouped_Tierarztpraxis Hutter","Remove: all source_of_contact vars - not of interest here",NA,NA
+"source_of_contact_grouped_Company/Association","Remove: all source_of_contact vars - not of interest here",NA,NA
+"source_of_contact_grouped_Schweineklinik Bern","Remove: all source_of_contact vars - not of interest here",NA,NA
+"source_of_contact_grouped_Stadtkind im Schweinestall","Remove: all source_of_contact vars - not of interest here",NA,NA
