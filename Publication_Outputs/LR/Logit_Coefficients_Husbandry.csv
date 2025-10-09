@@ -1,7 +1,0 @@
-Predictor;Estimate;Std_Error;Odds_Ratio;CI_2.5;CI_97.5;Subset;N
-(Intercept);-0.625;0.507;0.535;0.191;1.427;Husbandry;125
-contact_bird_in_stable_TRUE;1.077;0.400;2.937;1.352;6.534;Husbandry;125
-cross_fostering_farrowing_stable_2;-0.769;0.466;0.463;0.182;1.144;Husbandry;125
-drying_farrowing_stable_TRUE;-0.848;0.652;0.428;0.115;1.537;Husbandry;125
-cleaning_farrowing_stable_TRUE;0.635;0.766;1.887;0.432;8.998;Husbandry;125
-symptomatic_report_TRUE;0.558;0.556;1.746;0.587;5.293;Husbandry;125
